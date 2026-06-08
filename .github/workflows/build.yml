@@ -11,7 +11,7 @@ jobs:
     
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Theos Environment
       run: |
@@ -31,7 +31,7 @@ jobs:
         make
         
     - name: Upload Dylib Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: CellarScanner-Dylib
         # Theos 默认把编译好的动态库放在 .theos/obj/debug/ 目录下
