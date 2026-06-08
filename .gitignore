@@ -1,0 +1,19 @@
+# Theos build artifacts
+*.dylib
+*.deb
+obj/
+.package/
+.theos/
+
+# macOS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Debug symbols
+*.dSYM/

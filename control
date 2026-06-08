@@ -1,0 +1,9 @@
+Package: com.yourcompany.id5hook
+Name: id5hook
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: 游戏内存扫描悬浮窗 — 地窖坐标定位器
+Maintainer: Your Name <you@example.com>
+Author: Your Name <you@example.com>
+Section: Tweaks
+Depends: firmware (>= 14.0)
