@@ -13,14 +13,12 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Clone Theos (shallow)
+    - name: Clone Theos & SDKs
       run: |
         git clone --recursive --depth 1 https://github.com/theos/theos.git ~/theos
         echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-
-    - name: Clone iOS SDKs
-      run: |
-        git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
+        # sdks 已作为 theos 子模块随 --recursive 一同检出
+        ls ~/theos/sdks/ || (echo "SDK submodule missing, fetching manually..." && git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks)
 
     - name: Compile Dylib
       run: |
