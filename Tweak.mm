@@ -6,9 +6,17 @@
 
 #import <UIKit/UIKit.h>
 #import <mach/mach.h>
+#import <mach/mach_vm.h>
 #import <mach-o/dyld.h>
-#import <vector>
 #import <objc/runtime.h>
+#import <vector>
+
+// ============================================================
+//  MARK: - 前向声明
+// ============================================================
+
+static void ScanForCellar(void (^completion)(NSString *result));
+static void ShowAlert(NSString *message);
 
 // ============================================================
 //  MARK: - 安全内存读取
@@ -64,13 +72,11 @@ static bool ReadF32(uint64_t addr, float *outVal) {
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
-        // 拖动手势
         UIPanGestureRecognizer *pan =
             [[UIPanGestureRecognizer alloc] initWithTarget:self
                                                     action:@selector(handlePan:)];
         [self addGestureRecognizer:pan];
 
-        // 点击事件
         [self addTarget:self
                  action:@selector(onTap)
        forControlEvents:UIControlEventTouchUpInside];
@@ -98,7 +104,6 @@ static bool ReadF32(uint64_t addr, float *outVal) {
 }
 
 - (void)onTap {
-    // 禁止连续点击
     self.enabled = NO;
     [self setTitle:@"扫描中…" forState:UIControlStateNormal];
 
@@ -115,22 +120,17 @@ static bool ReadF32(uint64_t addr, float *outVal) {
 //  MARK: - 核心扫描逻辑
 // ============================================================
 
-/// 获取主可执行文件的基址（ASLR 后的 slide 地址）
 static uint64_t GetImageBase(void) {
-    // _dyld_get_image_header(0) 返回 mach_header 地址，即 ASLR 后的基址
     return (uint64_t)_dyld_get_image_header(0);
 }
 
-/// 后台执行扫描，完成后主线程回调
 static void ScanForCellar(void (^completion)(NSString *result)) {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSMutableString *output = [NSMutableString string];
 
-        uint64_t base    = GetImageBase();
-        // 读取基址 + 0x7A5DF30 拿到 coreAddr
+        uint64_t base     = GetImageBase();
         uint64_t coreAddr = base + 0x7A5DF30;
 
-        // 需要扫描的数组偏移列表
         const uint64_t arrayOffsets[] = { 0x90, 0x98, 0xA0, 0xA8, 0xB0 };
         const int      offsetCount    = sizeof(arrayOffsets) / sizeof(arrayOffsets[0]);
         const int      maxIter        = 1000;
@@ -141,16 +141,14 @@ static void ScanForCellar(void (^completion)(NSString *result)) {
             uint64_t arrBase = coreAddr + arrayOffsets[oi];
 
             for (int i = 0; i < maxIter; i++) {
-                // 读取实体指针
                 uint64_t entityPtr = 0;
                 if (!ReadI64(arrBase + (uint64_t)(i * 8), &entityPtr) || entityPtr == 0) {
                     continue;
                 }
 
-                // 先检查 +0x3D0，再检查 +0xD0
-                int32_t  cmpVal     = 0;
-                bool     matched    = false;
-                uint64_t matchOff   = 0;
+                int32_t  cmpVal   = 0;
+                bool     matched  = false;
+                uint64_t matchOff = 0;
 
                 if (ReadI32(entityPtr + 0x3D0, &cmpVal) && cmpVal == 892759396) {
                     matched  = true;
@@ -162,7 +160,6 @@ static void ScanForCellar(void (^completion)(NSString *result)) {
 
                 if (!matched) continue;
 
-                // 读取 entityPtr + 0x28 得到坐标结构体指针
                 uint64_t coordStruct = 0;
                 if (!ReadI64(entityPtr + 0x28, &coordStruct) || coordStruct == 0) {
                     continue;
@@ -194,20 +191,45 @@ static void ScanForCellar(void (^completion)(NSString *result)) {
 }
 
 // ============================================================
-//  MARK: - UI 辅助
+//  MARK: - UI 辅助（兼容 iOS 13+ UIScene / iOS 12 keyWindow 回退）
 // ============================================================
 
-/// 获取最顶层的 ViewController，用于 present 弹窗
+/// 获取当前活跃的 keyWindow（兼容多 Scene 和旧版）
+static UIWindow *GetKeyWindow(void) {
+    // iOS 13+: 遍历 connectedScenes 找 foreground active 的 UIWindowScene
+    NSSet<UIScene *> *scenes =
+        [[UIApplication sharedApplication] connectedScenes];
+    for (UIScene *scene in scenes) {
+        if (scene.activationState != UISceneActivationStateForegroundActive) {
+            continue;
+        }
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        for (UIWindow *w in windowScene.windows) {
+            if (w.isKeyWindow) {
+                return w;
+            }
+        }
+    }
+    // 回退：遍历所有 windows（兼容旧版 / 无 Scene 环境）
+    for (UIWindow *w in [[UIApplication sharedApplication] windows]) {
+        if (w.isKeyWindow) {
+            return w;
+        }
+    }
+    return [[UIApplication sharedApplication] windows].firstObject;
+}
+
 static UIViewController *TopmostViewController(void) {
-    UIViewController *root =
-        [[[UIApplication sharedApplication] keyWindow] rootViewController];
+    UIViewController *root = GetKeyWindow().rootViewController;
     while (root.presentedViewController) {
         root = root.presentedViewController;
     }
     return root;
 }
 
-/// 在主线程弹出结果
 static void ShowAlert(NSString *message) {
     UIViewController *vc = TopmostViewController();
     if (!vc) return;
@@ -223,20 +245,10 @@ static void ShowAlert(NSString *message) {
     [vc presentViewController:alert animated:YES completion:nil];
 }
 
-/// 在 keyWindow 上添加悬浮按钮（延迟 3 秒后调用）
 static void InstallFloatingButton(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
                    dispatch_get_main_queue(), ^{
-        UIWindow *win = [[UIApplication sharedApplication] keyWindow];
-        if (!win) {
-            // 回退：遍历所有 window 找到合适的
-            for (UIWindow *w in [[UIApplication sharedApplication] windows]) {
-                if (w.isKeyWindow || w.rootViewController) {
-                    win = w;
-                    break;
-                }
-            }
-        }
+        UIWindow *win = GetKeyWindow();
         if (!win) return;
 
         DragButton *btn = [[DragButton alloc] initWithFrame:CGRectMake(120, 300, 80, 44)];
@@ -258,7 +270,6 @@ static void InstallFloatingButton(void) {
 
 __attribute__((constructor))
 static void id5hook_entry(void) {
-    // 监听应用启动完成通知
     [[NSNotificationCenter defaultCenter]
         addObserverForName:UIApplicationDidFinishLaunchingNotification
                     object:nil
