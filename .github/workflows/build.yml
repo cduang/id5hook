@@ -3,36 +3,32 @@ name: Build iOS Dylib
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: # 允许手动点击按钮触发编译
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest # 使用苹果 macOS 服务器编译
-    
+    runs-on: macos-latest
+
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Setup Theos Environment
+    - name: Clone Theos (shallow)
       run: |
-        # 下载 Theos 核心
-        bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
-        echo "THEOS=~/theos" >> $GITHUB_ENV
-        
-    - name: Setup iOS SDK
+        git clone --recursive --depth 1 https://github.com/theos/theos.git ~/theos
+        echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+    - name: Clone iOS SDKs
       run: |
-        # 下载 iOS SDK 防止系统默认 SDK 缺失某些头文件
-        git clone https://github.com/theos/sdks.git ~/theos/sdks
-        
+        git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
+
     - name: Compile Dylib
       run: |
-        # 开始编译，使用静默模式并忽略部分非致命警告
         make clean
         make
-        
+
     - name: Upload Dylib Artifact
       uses: actions/upload-artifact@v4
       with:
         name: CellarScanner-Dylib
-        # Theos 默认把编译好的动态库放在 .theos/obj/debug/ 目录下
         path: .theos/obj/debug/*.dylib

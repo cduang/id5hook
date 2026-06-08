@@ -6,15 +6,13 @@
 TARGET := iphone:clang:latest:14.0
 ARCHS  := arm64
 
-# 目标注入进程 (替换为你目标游戏的进程名 / Bundle ID)
-INSTALL_TARGET_PROCESSES = com.example.targetgame
-
 # 无根包格式 (兼容 Dopamine / palera1n / TrollFools)
 THEOS_PACKAGE_SCHEME = rootless
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = id5hook
+# 使用 library 模板而非 tweak — 不链接 substrate
+LIBRARY_NAME = id5hook
 
 id5hook_FILES = Tweak.mm
 
@@ -22,11 +20,7 @@ id5hook_FILES = Tweak.mm
 id5hook_CFLAGS  = -fobjc-arc -std=c++17
 id5hook_CCFLAGS = -std=c++17
 
-# 链接所需框架
+# 链接所需框架（无 substrate）
 id5hook_LDFLAGS = -framework UIKit -framework Foundation -framework CoreGraphics
 
-include $(THEOS_MAKE_PATH)/tweak.mk
-
-# 编译后签名 (无根环境通常用 ldid2)
-after-install::
-	install.exec "ldid2 -S $(THEOS_STAGING_DIR)/Applications/$(TWEAK_NAME).dylib || true"
+include $(THEOS_MAKE_PATH)/library.mk
