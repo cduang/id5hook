@@ -6,10 +6,18 @@
 
 #import <UIKit/UIKit.h>
 #import <mach/mach.h>
-#import <mach/mach_vm.h>
 #import <mach-o/dyld.h>
 #import <objc/runtime.h>
 #import <vector>
+
+// mach/mach_vm.h 在 iOS SDK 中被编译期禁用（#error预处理），运行时始终可用
+// 使用 extern "C" 绕过编译期限制
+extern "C" {
+    kern_return_t mach_vm_read(vm_map_t, mach_vm_address_t,
+                               mach_vm_size_t, vm_offset_t *,
+                               mach_msg_type_number_t *);
+    kern_return_t mach_vm_deallocate(vm_map_t, mach_vm_address_t, mach_vm_size_t);
+}
 
 // ============================================================
 //  MARK: - 前向声明
