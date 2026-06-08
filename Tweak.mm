@@ -282,7 +282,7 @@ static void id5hook_entry(void) {
         addObserverForName:UIApplicationDidFinishLaunchingNotification
                     object:nil
                      queue:[NSOperationQueue mainQueue]
-                usingBlock:^(NSNotification * _Nonnull note) {
+                usingBlock:^(__unused NSNotification * _Nonnull note) {
         InstallFloatingButton();
     }];
 }

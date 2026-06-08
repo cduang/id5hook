@@ -16,9 +16,9 @@ LIBRARY_NAME = id5hook
 
 id5hook_FILES = Tweak.mm
 
-# ARC 支持 + C++17
-id5hook_CFLAGS  = -fobjc-arc -std=c++17
-id5hook_CCFLAGS = -std=c++17
+# ARC 支持 + C++17, 关闭废弃 API 警告（兼容性回退路径需要）
+id5hook_CFLAGS  = -fobjc-arc -std=c++17 -Wno-deprecated-declarations -Wno-unused-parameter
+id5hook_CCFLAGS = -std=c++17 -Wno-deprecated-declarations -Wno-unused-parameter
 
 # 链接所需框架（无 substrate）
 id5hook_LDFLAGS = -framework UIKit -framework Foundation -framework CoreGraphics
